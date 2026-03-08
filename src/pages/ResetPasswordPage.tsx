@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
 export function ResetPasswordPage() {
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.loading);
   const updatePassword = useAuthStore((s) => s.updatePassword);
 
   const [password, setPassword] = useState('');
@@ -11,6 +13,16 @@ export function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  // Give the Supabase client time to process the recovery token from the URL hash.
+  // If no session is established after 5 seconds, the link is expired/invalid.
+  useEffect(() => {
+    if (user || authLoading) return;
+
+    const timer = setTimeout(() => setExpired(true), 5000);
+    return () => clearTimeout(timer);
+  }, [user, authLoading]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,6 +63,38 @@ export function ResetPasswordPage() {
             className="mt-4 inline-block rounded-xl bg-leaf-600 px-6 py-2.5 text-white font-medium hover:bg-leaf-700"
           >
             Log in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Waiting for the recovery token to be processed
+  if (!user && !expired) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-14">
+        <div className="rounded-2xl border border-bark-100 bg-white p-6 md:p-8 shadow-sm text-center">
+          <p className="text-bark-500">Processing your reset link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No session established — link is expired or invalid
+  if (!user && expired) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-14">
+        <div className="rounded-2xl border border-petal-200 bg-petal-50 p-6 md:p-8 text-center">
+          <p className="text-4xl mb-4">⏰</p>
+          <h1 className="text-2xl font-display font-bold text-bark-900">Link expired</h1>
+          <p className="mt-2 text-bark-600">
+            This password reset link has expired or is invalid.
+          </p>
+          <Link
+            to="/forgot-password"
+            className="mt-4 inline-block rounded-xl bg-leaf-600 px-6 py-2.5 text-white font-medium hover:bg-leaf-700"
+          >
+            Request a new link
           </Link>
         </div>
       </div>
