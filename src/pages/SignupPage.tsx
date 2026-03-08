@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { LocationPicker } from '../components/LocationPicker';
 
 export function SignupPage() {
   const signup = useAuthStore((s) => s.signup);
@@ -13,6 +14,9 @@ export function SignupPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [locationLabel, setLocationLabel] = useState('');
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -35,7 +39,10 @@ export function SignupPage() {
     }
 
     setSubmitting(true);
-    const errorMsg = await signup(trimmedEmail, trimmedName, password);
+    const location = locationLat != null && locationLng != null && locationLabel
+      ? { label: locationLabel, lat: locationLat, lng: locationLng }
+      : undefined;
+    const errorMsg = await signup(trimmedEmail, trimmedName, password, location);
     setSubmitting(false);
 
     if (errorMsg) {
@@ -103,6 +110,24 @@ export function SignupPage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="mt-1.5 w-full rounded-xl border border-bark-200 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-leaf-300"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-bark-700">Location <span className="text-bark-400 font-normal">(optional)</span></label>
+            <p className="text-xs text-bark-400 mt-0.5 mb-1.5">See plants from your region in every lesson</p>
+            <LocationPicker
+              value={locationLabel}
+              onSelect={(result) => {
+                setLocationLabel(result.label);
+                setLocationLat(result.lat);
+                setLocationLng(result.lng);
+              }}
+              onClear={() => {
+                setLocationLabel('');
+                setLocationLat(null);
+                setLocationLng(null);
+              }}
             />
           </div>
 

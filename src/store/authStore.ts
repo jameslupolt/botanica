@@ -25,10 +25,12 @@ interface AuthState {
   initialized: boolean;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<string | null>;
-  signup: (email: string, displayName: string, password: string) => Promise<string | null>;
+  signup: (email: string, displayName: string, password: string, location?: { label: string; lat: number; lng: number }) => Promise<string | null>;
   logout: () => Promise<string | null>;
   updateProfile: (updates: Partial<Pick<Profile, 'displayName' | 'locationLabel' | 'locationLat' | 'locationLng'>>) => Promise<string | null>;
   fetchProfile: () => Promise<void>;
+  resetPassword: (email: string) => Promise<string | null>;
+  updatePassword: (newPassword: string) => Promise<string | null>;
 }
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
@@ -129,13 +131,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
   },
 
-  signup: async (email, displayName, password) => {
+  signup: async (email, displayName, password, location) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { display_name: displayName },
+          data: {
+            display_name: displayName,
+            ...(location && {
+              location_label: location.label,
+              location_lat: location.lat,
+              location_lng: location.lng,
+            }),
+          },
           emailRedirectTo: `${window.location.origin}/login`,
         },
       });
@@ -183,4 +192,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return 'Unable to save profile right now. Please try again.';
     }
   },
+
+  resetPassword: async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) return error.message;
+      return null;
+    } catch {
+      return 'Unable to send reset email right now. Please try again.';
+    }
+  },
+
+  updatePassword: async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return error.message;
+      return null;
+    } catch {
+      return 'Unable to update password right now. Please try again.';
+    }
+  },
+
 }));

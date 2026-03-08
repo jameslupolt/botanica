@@ -67,6 +67,12 @@ export function LoginPage() {
             />
           </div>
 
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-sm text-leaf-700 font-medium hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+
           {error && <p className="text-sm text-petal-700">{error}</p>}
 
           <button

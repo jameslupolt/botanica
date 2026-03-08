@@ -37,8 +37,14 @@ language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, display_name)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'display_name', ''));
+  insert into public.profiles (id, display_name, location_label, location_lat, location_lng)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'display_name', ''),
+    new.raw_user_meta_data ->> 'location_label',
+    (new.raw_user_meta_data ->> 'location_lat')::double precision,
+    (new.raw_user_meta_data ->> 'location_lng')::double precision
+  );
   return new;
 end;
 $$;
