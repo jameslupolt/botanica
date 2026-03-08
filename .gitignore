@@ -30,3 +30,4 @@ references/
 *.njsproj
 *.sln
 *.sw?
+.vercel

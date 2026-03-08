@@ -1,0 +1,8 @@
+references/
+node_modules/
+dist/
+.env
+.env.*
+*.png
+.git/
+.ruff_cache/
