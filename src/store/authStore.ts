@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useProgressStore } from './progressStore';
+import { useDrillStore } from './drillStore';
+import { useAchievementStore } from './achievementStore';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 let initPromise: Promise<void> | null = null;
@@ -163,6 +165,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       authSubscription = null;
       set({ user: null, profile: null, isAuthenticated: false, error: null, initialized: false });
       useProgressStore.getState().clearLocal();
+      useDrillStore.getState().clearDrill();
+      useAchievementStore.getState().clearAchievements();
       return null;
     } catch {
       return 'Unable to log out right now. Please try again.';

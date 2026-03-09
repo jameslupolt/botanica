@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import type { ComponentType } from 'react';
 import { Award, BarChart3, BookOpen, Flame, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { ALL_LESSONS } from '../data';
-import { ALL_MODULES, getModuleLessons, getModuleProgress } from '../data/modules';
+import { ALL_LESSONS, getModuleLessons } from '../data';
+import { ALL_MODULES, getModuleProgress } from '../data/modules';
 import { useAuthStore } from '../store/authStore';
 import { useProgressStore } from '../store/progressStore';
+import { useAchievementStore } from '../store/achievementStore';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { AchievementBadge } from '../components/AchievementBadge';
 import { RegionalPlants } from '../components/RegionalPlants';
@@ -12,7 +13,7 @@ import { RegionalPlants } from '../components/RegionalPlants';
 export function DashboardPage() {
   const profile = useAuthStore((s) => s.profile);
   const progress = useProgressStore((s) => s.lessonProgress);
-  const unlocked = useProgressStore((s) => s.unlockedAchievements);
+  const unlocked = useAchievementStore((s) => s.unlockedAchievements);
   const streak = useProgressStore((s) => s.streak);
   const completedCount = useProgressStore((s) => s.getCompletedCount());
   const avgScore = useProgressStore((s) => s.getTotalQuizAverage());

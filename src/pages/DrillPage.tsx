@@ -6,6 +6,7 @@ import { ALL_MODULES } from '../data/modules';
 import { buildDrillPool, generateSession, getEligibleModules, scoreSession } from '../lib/drill';
 import type { DrillQuestionAttempt, DrillQuestionRef, DrillSessionRecord, DrillSessionSettings, QuizQuestionType } from '../types';
 import { useProgressStore } from '../store/progressStore';
+import { useDrillStore } from '../store/drillStore';
 
 function createSessionId(): string {
   return `drill_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -24,8 +25,8 @@ function isCorrectAnswer(question: DrillQuestionRef, selected: number | number[]
 
 export function DrillPage() {
   const lessonProgress = useProgressStore((s) => s.lessonProgress);
-  const questionHistory = useProgressStore((s) => s.questionHistory);
-  const saveDrillSession = useProgressStore((s) => s.saveDrillSession);
+  const questionHistory = useDrillStore((s) => s.questionHistory);
+  const saveDrillSession = useDrillStore((s) => s.saveDrillSession);
 
   const eligibleModules = useMemo(
     () => getEligibleModules(ALL_MODULES, lessonProgress),

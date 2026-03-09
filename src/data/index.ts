@@ -106,7 +106,7 @@ import { reproductiveStressYieldStability } from './lessons/reproductive-stress-
 import { chronoculturePlantClocks } from './lessons/chronoculture-plant-clocks';
 import { reticulateEvolutionConflict } from './lessons/reticulate-evolution-conflict';
 import { defenseGrowthAllocation } from './lessons/defense-growth-allocation';
-import type { Lesson } from '../types';
+import type { Lesson, Module } from '../types';
 
 export const ALL_LESSONS: Lesson[] = [
   plantCells,
@@ -239,4 +239,10 @@ export function searchLessons(query: string): Lesson[] {
       l.description.toLowerCase().includes(q) ||
       l.category.toLowerCase().includes(q),
   );
+}
+
+export function getModuleLessons(mod: Module) {
+  return mod.lessonIds.map((id) => getLessonById(id)).filter(Boolean) as NonNullable<
+    ReturnType<typeof getLessonById>
+  >[];
 }

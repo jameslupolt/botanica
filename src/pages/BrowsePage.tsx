@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, CheckCircle2, Circle, Clock, Lock } from 'lucide-react';
-import { ALL_MODULES, getModuleLessons, getModuleProgress } from '../data/modules';
+import { getModuleLessons } from '../data';
+import { ALL_MODULES, getModuleProgress } from '../data/modules';
 import { useProgressStore } from '../store/progressStore';
 import { DIFFICULTY_META } from '../types';
 import type { Module, Lesson, LessonProgress } from '../types';

@@ -1,5 +1,4 @@
 import type { Module } from '../types';
-import { getLessonById } from './index';
 
 export const ALL_MODULES: Module[] = [
   {
@@ -185,12 +184,6 @@ export function getModuleBySlug(slug: string): Module | undefined {
 
 export function getModuleForLesson(lessonId: string): Module | undefined {
   return ALL_MODULES.find((m) => m.lessonIds.includes(lessonId));
-}
-
-export function getModuleLessons(mod: Module) {
-  return mod.lessonIds.map((id) => getLessonById(id)).filter(Boolean) as NonNullable<
-    ReturnType<typeof getLessonById>
-  >[];
 }
 
 export function getModuleProgress(

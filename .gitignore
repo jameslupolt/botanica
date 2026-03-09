@@ -31,3 +31,5 @@ references/
 *.sln
 *.sw?
 .vercel
+.ruff_cache/
+.sisyphus/

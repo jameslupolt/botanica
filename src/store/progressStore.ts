@@ -1,17 +1,13 @@
 import { create } from 'zustand';
-import type {
-  DrillQuestionHistory,
-  DrillSessionRecord,
-  LessonProgress,
-  UserProgress,
-} from '../types';
-import { ACHIEVEMENTS } from '../data/achievements';
-import { ALL_LESSONS } from '../data';
+import type { LessonProgress } from '../types';
 import { supabase } from '../lib/supabase';
+import { useAchievementStore } from './achievementStore';
+import { useDrillStore } from './drillStore';
 
-interface ProgressState extends UserProgress {
-  drillSessions: DrillSessionRecord[];
-  questionHistory: Record<string, DrillQuestionHistory>;
+interface ProgressState {
+  lessonProgress: Record<string, LessonProgress>;
+  streak: number;
+  lastActiveDate: string;
   loading: boolean;
   error: string | null;
   loadProgress: (userId: string) => Promise<void>;
@@ -22,8 +18,7 @@ interface ProgressState extends UserProgress {
   getCompletedCount: () => number;
   getTotalQuizAverage: () => number;
   updateStreak: () => void;
-  saveDrillSession: (session: DrillSessionRecord) => void;
-  resetProgress: () => void;
+  resetProgress: () => Promise<void>;
   clearLocal: () => void;
 }
 
@@ -40,39 +35,6 @@ function yesterdayStr(): string {
 async function getCurrentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user?.id ?? null;
-}
-
-function drillKey(userId: string): string {
-  return `botanica:drill:${userId}`;
-}
-
-function loadDrillLocal(userId: string): {
-  drillSessions: DrillSessionRecord[];
-  questionHistory: Record<string, DrillQuestionHistory>;
-} {
-  try {
-    const raw = localStorage.getItem(drillKey(userId));
-    if (!raw) return { drillSessions: [], questionHistory: {} };
-    const parsed = JSON.parse(raw) as {
-      drillSessions?: DrillSessionRecord[];
-      questionHistory?: Record<string, DrillQuestionHistory>;
-    };
-    return {
-      drillSessions: parsed.drillSessions ?? [],
-      questionHistory: parsed.questionHistory ?? {},
-    };
-  } catch {
-    return { drillSessions: [], questionHistory: {} };
-  }
-}
-
-function saveDrillLocal(
-  userId: string,
-  drillSessions: DrillSessionRecord[],
-  questionHistory: Record<string, DrillQuestionHistory>,
-) {
-  const payload = JSON.stringify({ drillSessions, questionHistory });
-  localStorage.setItem(drillKey(userId), payload);
 }
 
 // Debounced sync: collect pending writes and flush
@@ -127,7 +89,7 @@ async function flushSync(getState: () => ProgressState, setState: (updates: Part
       const { error } = await supabase.from('user_settings').upsert(
         {
           user_id: userId,
-          unlocked_achievements: state.unlockedAchievements,
+          unlocked_achievements: useAchievementStore.getState().unlockedAchievements,
           streak: state.streak,
           last_active_date: state.lastActiveDate || null,
           updated_at: new Date().toISOString(),
@@ -157,11 +119,8 @@ async function flushSync(getState: () => ProgressState, setState: (updates: Part
 
 export const useProgressStore = create<ProgressState>()((set, get) => ({
   lessonProgress: {},
-  unlockedAchievements: [],
   streak: 0,
   lastActiveDate: '',
-  drillSessions: [],
-  questionHistory: {},
   loading: false,
   error: null,
 
@@ -189,26 +148,21 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
       }
 
       const settings = settingsRes.data;
-      const localDrill = loadDrillLocal(userId);
+      useAchievementStore.setState({ unlockedAchievements: settings?.unlocked_achievements ?? [] });
 
       set({
         lessonProgress,
-        unlockedAchievements: settings?.unlocked_achievements ?? [],
         streak: settings?.streak ?? 0,
         lastActiveDate: settings?.last_active_date ?? '',
-        drillSessions: localDrill.drillSessions,
-        questionHistory: localDrill.questionHistory,
         loading: false,
         error: null,
       });
     } catch {
+      useAchievementStore.setState({ unlockedAchievements: [] });
       set({
         lessonProgress: {},
-        unlockedAchievements: [],
         streak: 0,
         lastActiveDate: '',
-        drillSessions: [],
-        questionHistory: {},
         loading: false,
         error: 'Unable to load progress right now.',
       });
@@ -234,6 +188,7 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
       };
     });
     get().updateStreak();
+    updateAchievementProgress(get);
     scheduleLessonSync(lessonId, get, set);
   },
 
@@ -253,7 +208,7 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
       };
     });
     get().updateStreak();
-    checkAchievements(get, set);
+    updateAchievementProgress(get);
     scheduleLessonSync(lessonId, get, set);
   },
 
@@ -277,7 +232,7 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
       };
     });
     get().updateStreak();
-    checkAchievements(get, set);
+    updateAchievementProgress(get);
     scheduleLessonSync(lessonId, get, set);
   },
 
@@ -307,65 +262,31 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
     });
   },
 
-  saveDrillSession: (session: DrillSessionRecord) => {
-    const nextHistory = { ...get().questionHistory };
-    for (const attempt of session.attempts) {
-      const prev = nextHistory[attempt.key] ?? {
-        attempts: 0,
-        correct: 0,
-        missStreak: 0,
-        lastSeen: session.completedAt,
-      };
-      const attempts = prev.attempts + 1;
-      const correct = prev.correct + (attempt.correct ? 1 : 0);
-      const missStreak = attempt.correct ? 0 : prev.missStreak + 1;
-      nextHistory[attempt.key] = {
-        attempts,
-        correct,
-        missStreak,
-        lastSeen: session.completedAt,
-      };
-    }
-
-    const nextSessions = [session, ...get().drillSessions].slice(0, 100);
-
-    set({
-      drillSessions: nextSessions,
-      questionHistory: nextHistory,
-    });
-
-    // Persist synchronously after state update — localStorage.setItem is sync,
-    // so no data is lost if the app crashes between set() and persist.
-    getCurrentUserId().then((userId) => {
-      if (!userId) return;
-      saveDrillLocal(userId, nextSessions, nextHistory);
-    });
-  },
-
   resetProgress: async () => {
     const userId = await getCurrentUserId();
     if (userId) {
-      localStorage.removeItem(drillKey(userId));
       const [lessonDeleteRes, settingsResetRes] = await Promise.all([
         supabase.from('lesson_progress').delete().eq('user_id', userId),
-        supabase.from('user_settings').update({
-          unlocked_achievements: [],
-          streak: 0,
-          last_active_date: null,
-          updated_at: new Date().toISOString(),
-        }).eq('user_id', userId),
+        supabase
+          .from('user_settings')
+          .update({
+            unlocked_achievements: [],
+            streak: 0,
+            last_active_date: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId),
       ]);
       if (lessonDeleteRes.error || settingsResetRes.error) {
         throw new Error('Progress reset failed');
       }
     }
+    useDrillStore.getState().clearDrill();
+    useAchievementStore.getState().clearAchievements();
     set({
       lessonProgress: {},
-      unlockedAchievements: [],
       streak: 0,
       lastActiveDate: '',
-      drillSessions: [],
-      questionHistory: {},
       error: null,
     });
   },
@@ -373,63 +294,20 @@ export const useProgressStore = create<ProgressState>()((set, get) => ({
   clearLocal: () => {
     set({
       lessonProgress: {},
-      unlockedAchievements: [],
       streak: 0,
       lastActiveDate: '',
-      drillSessions: [],
-      questionHistory: {},
       loading: false,
       error: null,
     });
   },
 }));
 
-function checkAchievements(
-  get: () => ProgressState,
-  set: (fn: (state: ProgressState) => Partial<ProgressState>) => void,
-) {
+function updateAchievementProgress(get: () => ProgressState) {
   const state = get();
-  const newlyUnlocked: string[] = [];
-
-  for (const achievement of ACHIEVEMENTS) {
-    if (state.unlockedAchievements.includes(achievement.id)) continue;
-
-    let earned = false;
-    const completedCount = Object.values(state.lessonProgress).filter((p) => p.completed).length;
-    const quizScores = Object.values(state.lessonProgress)
-      .map((p) => p.quizScore)
-      .filter((s): s is number => s !== null);
-
-    switch (achievement.id) {
-      case 'first-lesson':
-        earned = completedCount >= 1;
-        break;
-      case 'three-lessons':
-        earned = completedCount >= 3;
-        break;
-      case 'all-lessons':
-        earned = completedCount >= ALL_LESSONS.length;
-        break;
-      case 'perfect-quiz':
-        earned = quizScores.some((s) => s === 100);
-        break;
-      case 'quiz-master':
-        earned = quizScores.length >= 3 && quizScores.every((s) => s >= 80);
-        break;
-      case 'week-streak':
-        earned = state.streak >= 7;
-        break;
-      case 'first-steps':
-        earned = Object.keys(state.lessonProgress).length >= 1;
-        break;
-    }
-
-    if (earned) newlyUnlocked.push(achievement.id);
-  }
-
-  if (newlyUnlocked.length > 0) {
-    set((state) => ({
-      unlockedAchievements: [...state.unlockedAchievements, ...newlyUnlocked],
-    }));
-  }
+  const completedCount = Object.values(state.lessonProgress).filter((p) => p.completed).length;
+  const startedCount = Object.keys(state.lessonProgress).length;
+  const quizScores = Object.values(state.lessonProgress)
+    .map((p) => p.quizScore)
+    .filter((s): s is number => s !== null);
+  useAchievementStore.getState().checkAndUnlock(completedCount, startedCount, quizScores, state.streak);
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, BookOpen, LayoutDashboard, Leaf, Target } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -9,6 +9,24 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (dropdownOpen) {
+          setDropdownOpen(false);
+        }
+        if (mobileOpen) {
+          setMobileOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [dropdownOpen, mobileOpen]);
 
   const handleLogout = async (): Promise<boolean> => {
     setLogoutError(null);
@@ -31,6 +49,10 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-leaf-100">
+
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[60] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-leaf-600 focus:text-white font-medium">
+        Skip to content
+      </a>
       <div className="mx-auto max-w-6xl flex items-center justify-between px-4 h-16">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group" onClick={() => setMobileOpen(false)}>
@@ -72,6 +94,9 @@ export function Header() {
             <div className="relative">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
+                aria-expanded={dropdownOpen}
+                aria-haspopup="true"
+                aria-controls="user-menu"
                 className="flex items-center gap-2 text-sm font-medium text-bark-600 hover:text-leaf-700 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-leaf-100 flex items-center justify-center text-leaf-700 font-bold text-sm">
@@ -83,10 +108,11 @@ export function Header() {
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-lg border border-bark-100 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-lg border border-bark-100 py-1 z-50" id="user-menu" role="menu">
                     <Link
                       to="/profile"
                       onClick={() => setDropdownOpen(false)}
+                      role="menuitem"
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-bark-600 hover:bg-leaf-50 transition-colors"
                     >
                       <User className="h-4 w-4" />
@@ -94,6 +120,7 @@ export function Header() {
                     </Link>
                     <button
                       onClick={handleLogout}
+                      role="menuitem"
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-petal-600 hover:bg-petal-50 transition-colors"
                     >
                       <LogOut className="h-4 w-4" />
@@ -125,6 +152,9 @@ export function Header() {
         <button
           className="md:hidden p-2 text-bark-600 hover:text-bark-900"
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-menu"
+          aria-label="Toggle navigation menu"
         >
           {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -132,7 +162,7 @@ export function Header() {
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-leaf-100 bg-white px-4 py-4 space-y-2">
+        <div className="md:hidden border-t border-leaf-100 bg-white px-4 py-4 space-y-2" id="mobile-menu">
           <Link
             to="/browse"
             onClick={() => setMobileOpen(false)}
