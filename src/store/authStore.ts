@@ -103,10 +103,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        set({ error: error.message });
+        set({ error: 'Unable to load profile right now.' });
+        return;
+      }
+
+      if (!data) {
+        set({ profile: null, error: null });
         return;
       }
 
