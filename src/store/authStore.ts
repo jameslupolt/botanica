@@ -76,10 +76,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     initPromise = null;
 
     if (!authSubscription) {
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
           set({ user: session.user, isAuthenticated: true });
-          await get().fetchProfile();
+          // Skip profile fetch during recovery — the session is ephemeral
+          // and fetchProfile can hang if the recovery token can't refresh.
+          if (event !== 'PASSWORD_RECOVERY') {
+            await get().fetchProfile();
+          }
         } else {
           set({ user: null, profile: null, isAuthenticated: false });
         }
@@ -213,6 +217,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) return error.message;
+      // Sign out the ephemeral recovery session so the user logs in fresh.
+      // Fire-and-forget — the UI already shows success before this runs.
+      supabase.auth.signOut().catch(() => {});
       return null;
     } catch {
       return 'Unable to update password right now. Please try again.';
