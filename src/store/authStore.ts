@@ -76,13 +76,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     initPromise = null;
 
     if (!authSubscription) {
-      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.user) {
           set({ user: session.user, isAuthenticated: true });
           // Skip profile fetch during recovery — the session is ephemeral
           // and fetchProfile can hang if the recovery token can't refresh.
           if (event !== 'PASSWORD_RECOVERY') {
-            await get().fetchProfile();
+            setTimeout(() => {
+              get().fetchProfile().catch(() => {});
+            }, 0);
           }
         } else {
           set({ user: null, profile: null, isAuthenticated: false });
@@ -129,7 +131,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: async (email, password) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const timeoutMs = 12_000;
+      const timeoutError = new Promise<{ error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ error: { message: 'Login timed out. Please try again.' } }), timeoutMs);
+      });
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeoutError,
+      ]);
+      const error = 'error' in result ? result.error : null;
       if (error) return error.message;
       return null;
     } catch {
@@ -215,7 +225,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   updatePassword: async (newPassword) => {
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const timeoutMs = 12_000;
+      const timeoutError = new Promise<{ error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ error: { message: 'Password update timed out. Please request a new reset link and try again.' } }), timeoutMs);
+      });
+      const result = await Promise.race([
+        supabase.auth.updateUser({ password: newPassword }),
+        timeoutError,
+      ]);
+      const error = 'error' in result ? result.error : null;
       if (error) return error.message;
       // Sign out the ephemeral recovery session so the user logs in fresh.
       // Fire-and-forget — the UI already shows success before this runs.
